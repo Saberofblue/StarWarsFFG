@@ -811,6 +811,7 @@
       "talents": {},
       "abilities": {},
       "species": {},
+      "bonusSkills": [],
       "startingXP": 0
     },
     "criticalinjury": {

@@ -145,6 +145,8 @@ export class CharacterCreator extends HandlebarsApplicationMixin(ApplicationV2) 
         careerCareerSkillRanks: [],
         specialization: null,
         specializationCareerSkillRanks: [],
+        // species "choose N skills" grants (Human etc.); entries: { trainingIndex, skill }
+        speciesSkillRanks: [],
         rules: 'fad',
         motivations: [],
       },
@@ -299,6 +301,16 @@ export class CharacterCreator extends HandlebarsApplicationMixin(ApplicationV2) 
       $container.next(".specialization_skill_rank_select-selection").toggle('slow');
     });
     $(`.${this._openCareerSection}`).next().show();
+    // species bonus skill pickers (Human's non-career skills, etc.)
+    $(".species_tab-container").on("click", (event) => {
+      const idx = $(event.currentTarget).data("species-index");
+      // remember which picker is open so it survives the re-render triggered by picking a skill rank
+      this._openSpeciesPicker = this._openSpeciesPicker === idx ? undefined : idx;
+      $(event.currentTarget).next(".species_skill_rank_select-selection").toggle('slow');
+    });
+    if (this._openSpeciesPicker !== undefined) {
+      $(`.species_tab-container[data-species-index="${this._openSpeciesPicker}"]`).next(".species_skill_rank_select-selection").show();
+    }
 
     // specializations
     const specializationsTable = new DataTable(
@@ -612,7 +624,94 @@ export class CharacterCreator extends HandlebarsApplicationMixin(ApplicationV2) 
     context.careerKeys = careerKeys;
     context.specializationKeys = specializationKeys;
 
+    // build the species "choose N skills" pickers (Human's 2 non-career skills, etc.).
+    // this also folds the player's species picks into combinedPurchases (by reference) for the preview.
+    context.speciesBonusSkills = this._buildSpeciesBonusSkillPickers(combinedPurchases, careerKeys, specializationKeys);
+
     return context;
+  }
+
+  /**
+   * Build the list of species "choose N skills" pickers for the current species selection.
+   * Data-driven from species.system.bonusSkills (populated by the OggDude importer from StartingSkillTraining).
+   * Mirrors the career/specialization skill pickers. Also folds the player's species picks into
+   * combinedPurchases so the actor preview reflects them.
+   * @param {object} combinedPurchases - map of skillName -> rank count (mutated in place)
+   * @param {string[]} careerKeys - skill names granted as career skills by the selected career
+   * @param {string[]} specializationKeys - skill names granted as career skills by the selected specialization
+   * @returns {Array<object>}
+   */
+  _buildSpeciesBonusSkillPickers(combinedPurchases, careerKeys, specializationKeys) {
+    const pickers = [];
+    const bonusSkills = this.data.selected.species?.system?.bonusSkills;
+    if (!this.tempActor || !Array.isArray(bonusSkills) || bonusSkills.length === 0) {
+      return pickers;
+    }
+
+    const allSkillNames = Object.keys(this.tempActor.system.skills);
+    const careerSkillSet = new Set([...careerKeys, ...specializationKeys]);
+    const careerSelected = !!this.data.selected.career;
+    const specializationSelected = !!this.data.selected.specialization;
+
+    bonusSkills.forEach((entry, index) => {
+      // determine the allowed skills and whether prerequisites (career/spec selection) are satisfied
+      let keys = [];
+      let ready = true;
+      let requirementLabel;
+      switch (entry.requirement) {
+        case "nonCareer":
+          // non-career is only well-defined once the career skill set is known (career + specialization chosen)
+          ready = careerSelected && specializationSelected;
+          keys = ready ? allSkillNames.filter((s) => !careerSkillSet.has(s)) : [];
+          requirementLabel = "SWFFG.CharacterCreator.SpeciesBonusSkills.NonCareer";
+          break;
+        case "career":
+          ready = careerSelected;
+          keys = ready ? [...careerKeys] : [];
+          requirementLabel = "SWFFG.CharacterCreator.SpeciesBonusSkills.Career";
+          break;
+        case "specialization":
+          ready = specializationSelected;
+          keys = ready ? [...specializationKeys] : [];
+          requirementLabel = "SWFFG.CharacterCreator.SpeciesBonusSkills.Specialization";
+          break;
+        case "skillType":
+          if (entry.skillType && entry.skillType !== "all") {
+            keys = allSkillNames.filter((s) => this.tempActor.system.skills[s]?.type === entry.skillType);
+          } else {
+            keys = [...allSkillNames];
+          }
+          requirementLabel = "SWFFG.CharacterCreator.SpeciesBonusSkills.SkillType";
+          break;
+        default:
+          keys = [...allSkillNames];
+          requirementLabel = "SWFFG.CharacterCreator.SpeciesBonusSkills.Any";
+      }
+
+      // per-picker purchase map, and fold the picks into the combined preview
+      const purchases = {};
+      for (const pick of this.data.selected.speciesSkillRanks) {
+        if (pick.trainingIndex !== index) continue;
+        purchases[pick.skill] = (purchases[pick.skill] ?? 0) + 1;
+        if (Object.prototype.hasOwnProperty.call(combinedPurchases, pick.skill)) {
+          combinedPurchases[pick.skill]++;
+        }
+      }
+
+      pickers.push({
+        index,
+        count: entry.count,
+        requirement: entry.requirement,
+        requirementLabel,
+        skillType: entry.skillType,
+        ready,
+        keys,
+        purchases,
+        selectedCount: Object.values(purchases).reduce((a, b) => a + b, 0),
+      });
+    });
+
+    return pickers;
   }
 
   /** @override */
@@ -964,6 +1063,8 @@ export class CharacterCreator extends HandlebarsApplicationMixin(ApplicationV2) 
       return ui.notifications.warn(`Unable to find species!`);
     }
     this.data.selected.species = selectedSpecies;
+    // clear any previously-chosen species bonus skills, as they belong to the prior species
+    this.data.selected.speciesSkillRanks = [];
     await this.showCharacterStatusShim();
   }
 
@@ -1191,6 +1292,32 @@ export class CharacterCreator extends HandlebarsApplicationMixin(ApplicationV2) 
         await specializationItem.createEmbeddedDocuments("ActiveEffect", [AE]);
       }
     }
+
+    // apply species bonus skill ranks (Human's chosen non-career skills, etc.)
+    const speciesItem = tempActor.items.find(i => i.type === "species");
+    if (speciesItem) {
+      for (const skillPurchase of this.data.selected.speciesSkillRanks) {
+        const nk = new Date().getTime();
+        await speciesItem.update({
+          "system.attributes": {
+            [`attr${nk}`]: {
+              modtype: "Skill Rank",
+              mod: skillPurchase.skill,
+              value: 1,
+            },
+          }
+        });
+        const AE = {
+          name: `attr${nk}`,
+          changes: [{
+            key: `system.skills.${skillPurchase.skill}.rank`,
+            mode: CONST.ACTIVE_EFFECT_MODES.ADD,
+            value: 1,
+          }],
+        };
+        await speciesItem.createEmbeddedDocuments("ActiveEffect", [AE]);
+      }
+    }
     CONFIG.logger.debug("assigning to local actor record");
     this.tempActor = tempActor;
     CONFIG.logger.debug("re-rendering");
@@ -1244,6 +1371,16 @@ export class CharacterCreator extends HandlebarsApplicationMixin(ApplicationV2) 
           return purchase === skill;
         });
         this.data.selected.specializationCareerSkillRanks.splice(purchaseIndex, 1);
+      }
+    } else if (skillMode === "species") {
+      const trainingIndex = parseInt(target.data("species-index"), 10);
+      if (direction === "increase") {
+        this.data.selected.speciesSkillRanks.push({ trainingIndex, skill });
+      } else {
+        const purchaseIndex = this.data.selected.speciesSkillRanks.findIndex(function (purchase) {
+          return purchase.trainingIndex === trainingIndex && purchase.skill === skill;
+        });
+        this.data.selected.speciesSkillRanks.splice(purchaseIndex, 1);
       }
     } else {
       if (direction === "increase") {
@@ -1828,6 +1965,32 @@ export class CharacterCreator extends HandlebarsApplicationMixin(ApplicationV2) 
           }],
         };
         await specializationItem.createEmbeddedDocuments("ActiveEffect", [AE]);
+      }
+    }
+
+    // apply species bonus skill ranks (Human's chosen non-career skills, etc.)
+    const speciesItem = newActor.items.find(i => i.type === "species");
+    if (speciesItem) {
+      for (const skillPurchase of this.data.selected.speciesSkillRanks) {
+        const nk = new Date().getTime();
+        await speciesItem.update({
+          "system.attributes": {
+            [`attr${nk}`]: {
+              modtype: "Skill Rank",
+              mod: skillPurchase.skill,
+              value: 1,
+            },
+          }
+        });
+        const AE = {
+          name: `attr${nk}`,
+          changes: [{
+            key: `system.skills.${skillPurchase.skill}.rank`,
+            mode: CONST.ACTIVE_EFFECT_MODES.ADD,
+            value: 1,
+          }],
+        };
+        await speciesItem.createEmbeddedDocuments("ActiveEffect", [AE]);
       }
     }
 
