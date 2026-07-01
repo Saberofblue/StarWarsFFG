@@ -488,9 +488,10 @@ export class CombatFFG extends Combat {
       CONFIG.FFG.preCombatDelete = Hooks.on("preDeleteCombatant", registerHandleCombatantRemoval);
     }
     // now create a new slot to replace it
+    let replacementTurnId;
     if (combatant.combat.started) {
       CONFIG.logger.debug("Re-creating the slot with the same disposition and initiative");
-      const replacementTurnId = await this.addExtraSlot(round, disposition, initiative);
+      replacementTurnId = await this.addExtraSlot(round, disposition, initiative);
     }
 
     // if there was a claim on the slot replaced, add it back
@@ -504,7 +505,7 @@ export class CombatFFG extends Combat {
     this.prepareDerivedData();
     this.setupTurns();
     // emit a socket event
-    game.socket.emit("system.starwarsffg", {event: "trackerRender", combatId: combat.id});
+    game.socket.emit("system.starwarsffg", {event: "trackerRender", combatId: this.id});
   }
 
   async removeLastSlot(combatantId) {
@@ -740,7 +741,7 @@ export class CombatFFG extends Combat {
     CONFIG.logger.debug("Re-rendering the tracker and emitting a socket event for other clients");
     this.setupTurns();
     // emit a socket event
-    game.socket.emit("system.starwarsffg", {event: "trackerRender", combatId: combat.id});
+    game.socket.emit("system.starwarsffg", {event: "trackerRender", combatId: this.id});
   }
 
   /** @override */
