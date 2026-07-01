@@ -326,7 +326,7 @@ export function get_dice_pool(actor_id, skill_name, incoming_roll) {
     triumph: (skill.triumph ?? 0) + incoming_roll.triumph,
     despair: (skill.despair ?? 0) + incoming_roll.despair,
     upgrades: (skill.upgrades ?? 0) + incoming_roll.upgrades,
-    remsetback: skill?.remsetback ? skill.remsetback : 0 + incoming_roll.remsetback,
+    remsetback: (skill?.remsetback ?? 0) + incoming_roll.remsetback,
     difficulty: +incoming_roll.difficulty,
     challenge: +incoming_roll.challenge,
   });
