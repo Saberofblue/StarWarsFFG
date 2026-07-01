@@ -1434,9 +1434,12 @@ export class CharacterCreator extends HandlebarsApplicationMixin(ApplicationV2) 
       });
     } else {
       const purchaseIndex = this.data.purchases.xp.talents.findIndex(function(purchase) {
-        return purchase.key === upgrade && purchase.specName === parentForcePower;
+        // specName was stored as parentForcePower.name; compare against the name, not the object
+        return purchase.key === upgrade && purchase.specName === parentForcePower.name;
       });
-      this.data.purchases.xp.talents.splice(purchaseIndex, 1);
+      if (purchaseIndex > -1) {
+        this.data.purchases.xp.talents.splice(purchaseIndex, 1);
+      }
     }
 
     // rebuild the actor to apply the changes
