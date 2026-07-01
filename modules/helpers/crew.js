@@ -47,9 +47,9 @@ export async function register_crew(...args) {
  * @param crew_member actor ID of the crew being changed
  * @param crew_role role of the crew to remove
  */
-export function deregister_crew(vehicle_actor, crew_member, crew_role) {
+export async function deregister_crew(vehicle_actor, crew_member, crew_role) {
     CONFIG.logger.debug("Got deregister crew request");
-    const flag_data = vehicle_actor.getFlag('starwarsffg', 'crew');
+    const flag_data = vehicle_actor.getFlag('starwarsffg', 'crew') ?? [];
     let new_flag_data = [];
 
     for (let i = 0; i < flag_data.length; i++) {
@@ -65,9 +65,9 @@ export function deregister_crew(vehicle_actor, crew_member, crew_role) {
     CONFIG.logger.debug("Final updated flag data: ", new_flag_data);
     if (new_flag_data.length === 0) {
       // the last crew member was removed, delete the data
-      vehicle_actor.unsetFlag('starwarsffg', 'crew');
+      await vehicle_actor.unsetFlag('starwarsffg', 'crew');
     } else {
-      vehicle_actor.setFlag('starwarsffg', 'crew', new_flag_data);
+      await vehicle_actor.setFlag('starwarsffg', 'crew', new_flag_data);
     }
 }
 
@@ -82,7 +82,7 @@ export async function change_role(vehicle_actor, crew_member, old_crew_role, new
     CONFIG.logger.debug(
       `Got role change request: vehicle ID: ${vehicle_actor} | crew ID: ${crew_member} | old role: ${old_crew_role} | new role: ${new_crew_role}`
     );
-    const flag_data = vehicle_actor.getFlag('starwarsffg', 'crew');
+    const flag_data = vehicle_actor.getFlag('starwarsffg', 'crew') ?? [];
     let new_flag_data = [];
 
     if (flag_data.filter(i => i.actor_id === crew_member && i.role === new_crew_role).length > 0) {
@@ -102,7 +102,7 @@ export async function change_role(vehicle_actor, crew_member, old_crew_role, new
 
     CONFIG.logger.debug("Final updated flag data: ", new_flag_data);
     // set the updated flag data
-    vehicle_actor.setFlag('starwarsffg', 'crew', new_flag_data);
+    await vehicle_actor.setFlag('starwarsffg', 'crew', new_flag_data);
 }
 
 /**

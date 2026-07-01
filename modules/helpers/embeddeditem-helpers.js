@@ -138,7 +138,7 @@ export default class EmbeddedItemHelpers {
         }
       };
     } else {
-      ui.notifictions.warn(`You shouldn't see this. Please notify the devs if you do - reconstruct length was ${reconstruct.length}`);
+      ui.notifications.warn(`You shouldn't see this. Please notify the devs if you do - reconstruct length was ${reconstruct.length}`);
       CONFIG.logger.warn(`You shouldn't see this. Please notify the devs if you do - reconstruct length was ${reconstruct.length}`);
     }
 
@@ -179,7 +179,7 @@ export default class EmbeddedItemHelpers {
         ownedItem.system.itemattachment.forEach((a) => {
           modifierIndex = a.system[modifierType].findIndex((m) => m.id === modifierId);
           if (modifierIndex > -1) {
-            item = a.data[modifierType][modifierIndex];
+            item = a.system[modifierType][modifierIndex];
           }
         });
       }
@@ -224,7 +224,7 @@ export default class EmbeddedItemHelpers {
     if (!isNaN(modifierId)) {
       modifierIndex = modifierId;
     } else {
-      modifierIndex = ownedItem.data.data[modifierType].findIndex((i) => i.id === modifierId);
+      modifierIndex = ownedItem.system[modifierType].findIndex((i) => i.id === modifierId);
     }
 
     let item;
