@@ -547,11 +547,17 @@ export class ActorFFG extends Actor {
     // handle direct active effects - which only come from statuses
     const actorActiveEffects = actorData.getEmbeddedCollection("ActiveEffect");
     for (const effect of actorActiveEffects) {
+      // mirror the item-effect loop below: skip disabled effects and effects targeting a skill
+      // this actor doesn't have (a renamed/removed skill would otherwise crash on the source lookup)
+      if (effect.disabled) continue;
       for (const change of effect.changes) {
         if (change.key.includes("system.skills")) {
           const skillName = change.key.split('.')[2].capitalize();
           const skillMod = change.key.split('.')[3];
           const modType = ModifierHelpers.getModTypeByModPath(change.key);
+          if (!Object.keys(actorData.system.skills).includes(skillName)) {
+            continue;
+          }
           if (!Object.keys(actorData.system.skills[skillName]).includes(`${skillMod}source`)) {
             actorData.system.skills[skillName][`${skillMod}source`] = [];
           }
@@ -620,21 +626,18 @@ export class ActorFFG extends Actor {
       try {
         // Calculate encumbrance, only if encumbrance value exists
         if (item.system?.encumbrance?.adjusted !== undefined || item.system?.encumbrance?.value !== undefined) {
+          // treat a missing quantity as 1 item (not 0), and coerce all values to numbers so a
+          // string/undefined encumbrance can't turn the whole total into NaN
+          const rawCount = item.system?.quantity?.value;
+          const count = (rawCount === undefined || rawCount === null) ? 1 : (parseInt(rawCount, 10) || 0);
           if (item.type === "armour" && item?.system?.equippable?.equipped) {
-            const equippedEncumbrance = +item.system.encumbrance.adjusted - 3;
+            const equippedEncumbrance = (parseInt(item.system.encumbrance.adjusted, 10) || 0) - 3;
             encum += equippedEncumbrance > 0 ? equippedEncumbrance : 0;
           } else if (item.type === "armour" || item.type === "weapon" || item.type === "shipweapon") {
-            let count = 0;
-            if (item.system?.quantity?.value) {
-              count = item.system.quantity.value;
-            }
-            encum += ((item.system?.encumbrance?.adjusted !== undefined) ? item.system?.encumbrance?.adjusted : item.system?.encumbrance?.value) * count;
+            const rawEncum = (item.system?.encumbrance?.adjusted !== undefined) ? item.system?.encumbrance?.adjusted : item.system?.encumbrance?.value;
+            encum += (parseInt(rawEncum, 10) || 0) * count;
           } else {
-            let count = 0;
-            if (item.system?.quantity?.value) {
-              count = item.system.quantity.value;
-            }
-            encum += item.system?.encumbrance?.value * count;
+            encum += (parseInt(item.system?.encumbrance?.value, 10) || 0) * count;
           }
         }
       } catch (err) {
