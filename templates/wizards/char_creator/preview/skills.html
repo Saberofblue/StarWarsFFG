@@ -71,6 +71,17 @@
               )}}
                 <i class="far fa-minus-square" data-action="skill-control" data-direction="decrease" data-target="{{ skill.name }}" data-value="{{ skill.rank }}" data-mode="{{ ../../mode }}"></i>
               {{/if}}
+              <!--
+                remove rank button for species mode
+                skill.rank > 0 and mode === species and skill.name in purchases
+              -->
+              {{#if (and
+                (gt skill.rank 0)
+                (eq ../../mode "species")
+                (lookup ../../purchases skill.name)
+              )}}
+                <i class="far fa-minus-square" data-action="skill-control" data-direction="decrease" data-target="{{ skill.name }}" data-value="{{ skill.rank }}" data-mode="{{ ../../mode }}" data-species-index="{{ ../../speciesIndex }}"></i>
+              {{/if}}
 
               <!--
                 add rank button for xp_spend mode
@@ -107,6 +118,19 @@
                 (in skill.name ../../keys)
               )}}
                 <i class="far fa-plus-square" data-action="skill-control" data-direction="increase" data-target="{{ skill.name }}" data-value="{{ skill.rank }}" data-mode="{{ ../../mode }}"></i>
+              {{/if}}
+              <!--
+                add rank button for species mode
+                skill.rank < 2 and mode === species and skill.name not in purchases and len(purchases) < cap and skill.name in (allowed keys)
+              -->
+              {{#if (and
+                (lt skill.rank 2)
+                (eq ../../mode "species")
+                (eq (lookup ../../purchases skill.name) undefined)
+                (lt (keylen ../../purchases) ../../cap)
+                (in skill.name ../../keys)
+              )}}
+                <i class="far fa-plus-square" data-action="skill-control" data-direction="increase" data-target="{{ skill.name }}" data-value="{{ skill.rank }}" data-mode="{{ ../../mode }}" data-species-index="{{ ../../speciesIndex }}"></i>
               {{/if}}
 
               {{#with (lookup ../../actor.system.characteristics [characteristic])~}}

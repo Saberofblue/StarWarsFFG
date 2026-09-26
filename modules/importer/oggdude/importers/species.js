@@ -42,6 +42,8 @@ export default class Species {
               description: item.Description,
               talents: {},
               abilities: {},
+              // structured "choose N skills" grants derived from OggDude StartingSkillTraining (see parseSkillTrainings)
+              bonusSkills: [],
               startingXP: item.StartingAttrs.Experience ? parseInt(item.StartingAttrs.Experience, 10) : 0,
               metadata: {
                 tags: [
@@ -140,6 +142,12 @@ export default class Species {
                       description: curOption.Description,
                     },
                   };
+
+                  // capture structured "choose N skills" grants (e.g. Human's 2 non-career skills) so the
+                  // character creator can offer the choice instead of silently dropping it into ability text
+                  if (curOption?.StartingSkillTraining) {
+                    data.data.bonusSkills.push(...Species.parseSkillTrainings(curOption.StartingSkillTraining));
+                  }
                 }
 
                 if (option[0].DieModifiers) {
@@ -189,5 +197,52 @@ export default class Species {
     } catch (err) {
       CONFIG.logger.error(`Error importing record : `, err);
     }
+  }
+
+  /**
+   * Parse one or more OggDude <StartingSkillTraining> blocks into structured "choose N skills" grants.
+   * OggDude models these as: StartingSkillTraining > SkillTraining[] > { SkillCount, Requirement }.
+   * A single Option may carry several StartingSkillTraining siblings (e.g. Mandalorian Human), and a single
+   * StartingSkillTraining may carry several SkillTraining entries (e.g. Droid), so both levels are normalised.
+   * @param {object|object[]} startingSkillTraining - the JXON value of curOption.StartingSkillTraining
+   * @returns {Array<{count:number, requirement:string, skillType?:string}>}
+   */
+  static parseSkillTrainings(startingSkillTraining) {
+    const results = [];
+    const blocks = Array.isArray(startingSkillTraining) ? startingSkillTraining : [startingSkillTraining];
+    for (const block of blocks) {
+      if (!block?.SkillTraining) continue;
+      const trainings = Array.isArray(block.SkillTraining) ? block.SkillTraining : [block.SkillTraining];
+      for (const training of trainings) {
+        const count = training?.SkillCount ? parseInt(training.SkillCount, 10) : 0;
+        if (!count) continue;
+        const req = training?.Requirement ?? {};
+        const entry = { count, requirement: "all" };
+        if (req.NonCareer === "true") {
+          entry.requirement = "nonCareer";
+        } else if (req.Specialization === "true") {
+          entry.requirement = "specialization";
+        } else if (req.Career === "true") {
+          entry.requirement = "career";
+        } else if (req.FromSkillType === "true") {
+          entry.requirement = "skillType";
+          entry.skillType = Species.mapSkillType(req.SkillType);
+        }
+        results.push(entry);
+      }
+    }
+    return results;
+  }
+
+  /**
+   * Map an OggDude st-prefixed skill-type enum (stAll, stGeneral, stCombat, stSocial, stKnowledge, stMagic)
+   * to the system's skill `type` value. "all" means no type restriction.
+   * @param {string} raw
+   * @returns {string}
+   */
+  static mapSkillType(raw) {
+    if (!raw) return "all";
+    const stripped = raw.replace(/^st/, "");
+    return stripped.toLowerCase() === "all" ? "all" : stripped;
   }
 }
