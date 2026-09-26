@@ -2718,12 +2718,24 @@ export default class ImportHelpers {
       if (mod.Key) {
         let skill = CONFIG.temporary.skills[mod.Key];
 
-        if (skill.includes(":") && !skill.includes(": ")) {
-          skill = skill.replace(":", ": ");
-        }
+        if (typeof skill === "string") {
+          // normalise OggDude sub-skill spellings to the canonical system names, e.g.
+          // "Knowledge:Underworld" or "Piloting - Space" -> "Knowledge: Underworld" / "Piloting: Space"
+          if (skill.includes(" - ")) {
+            skill = skill.replace(" - ", ": ");
+          } else if (skill.includes(":") && !skill.includes(": ")) {
+            skill = skill.replace(":", ": ");
+          }
 
-        if (Object.keys(CONFIG.FFG.skills).includes(skill)) {
-          type = CONFIG.temporary.skills[mod.Key];
+          if (Object.keys(CONFIG.FFG.skills).includes(skill)) {
+            // store the matched canonical name (not the raw dataset spelling) so downstream
+            // consumers (modifiers.js / pool.js) can match it by name
+            type = skill;
+          } else {
+            CONFIG.logger.warn(`processSkillMod: could not resolve skill key '${mod.Key}' ('${skill}') to a known skill; skipping this modifier`);
+          }
+        } else {
+          CONFIG.logger.warn(`processSkillMod: unknown skill key '${mod.Key}'; skipping this modifier`);
         }
       } else if (mod?.Skill) {
         type = mod.Skill;
@@ -2752,7 +2764,9 @@ export default class ImportHelpers {
       } else if (dieMod.SkillKey) {
         // this is a skill modifier
         const skillModifier = ImportHelpers.processSkillMod({ Key: dieMod.SkillKey, ...dieMod });
-        output.attributes[key] = skillModifier.value;
+        if (skillModifier) {
+          output.attributes[key] = skillModifier.value;
+        }
       } else if (dieMod.SkillChar) {
         // this is a skill modifier based on characteristic (ex all Brawn skills);
         const skillTheme = await game.settings.get("starwarsffg", "skilltheme");
@@ -2762,7 +2776,9 @@ export default class ImportHelpers {
 
         characteristicSkills.forEach((cs) => {
           const skillModifier = ImportHelpers.processSkillMod({ Skill: cs, ...dieMod });
-
+          if (!skillModifier) {
+            return;
+          }
           if (output.attributes[key]) {
             output.attributes[key].value += skillModifier.value.value;
           } else {
@@ -2777,7 +2793,9 @@ export default class ImportHelpers {
 
         characteristicSkills.forEach((cs) => {
           const skillModifier = ImportHelpers.processSkillMod({ Skill: cs, ...dieMod });
-
+          if (!skillModifier) {
+            return;
+          }
           if (output.attributes[key]) {
             output.attributes[key].value += skillModifier.value.value;
           } else {
@@ -2786,7 +2804,9 @@ export default class ImportHelpers {
         });
       } else {
         const skillModifier = ImportHelpers.processSkillMod({ Key: dieMod.SkillKey, ...dieMod }, true);
-        output.attributes[key] = skillModifier.value;
+        if (skillModifier) {
+          output.attributes[key] = skillModifier.value;
+        }
       }
     });
 

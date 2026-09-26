@@ -86,6 +86,25 @@ export default class Specializations {
                   talentItem = ImportHelpers.findEntityByImportId("items", talentKey);
                 }
 
+                if (!talentItem) {
+                  // the referenced talent failed to import (e.g. an unresolvable die-modifier skill
+                  // reference). Degrade to a placeholder cell instead of dropping the whole
+                  // specialization. Shaped to satisfy the property accesses below.
+                  CONFIG.logger.warn(`Specialization '${item.Key}' references a missing talent '${talentKey}'; inserting a placeholder cell.`);
+                  talentItem = {
+                    _id: "",
+                    name: talentKey,
+                    system: {
+                      attributes: {},
+                      description: "",
+                      activation: { value: "Passive", label: "SWFFG.TalentActivationsPassive" },
+                      isForceTalent: false,
+                      isConflictTalent: false,
+                      ranks: { ranked: false },
+                    },
+                  };
+                }
+
                 const originalAttributes = foundry.utils.deepClone(talentItem.system.attributes);
                 for (const attribute of Object.keys(originalAttributes)) {
                   const nk = new Date().getTime();
