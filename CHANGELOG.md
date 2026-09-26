@@ -1,4 +1,12 @@
 `2.0.4`
+* Enhancements:
+  * Adds support for Foundry VTT 14 build 366 while retaining Foundry VTT 13 support.
+  * Migrates legacy Active Effects on world documents, unlinked token actors, embedded items, and writable world compendiums to the Version 14 Active Effects V2 schema.
+  * Adds local Version 13/14 browser validation for documents, chat visibility, dice, combat, importers, macros, migration, and multi-client synchronization.
+* Fixes:
+  * Updates chat rendering, message visibility, combat helpers, drag-and-drop, and generated macros to supported Foundry VTT 14 APIs.
+  * Preserves direct, transferred, disabled, status, duration, and inherent Item effect behavior after a Version 14 world migration.
+  * Prevents cyclic Version 14 sheet context data from overflowing recursive Item-sheet helpers.
 * Features:
   * Added a compendium browser to search and filter items across all world compendiums! ([#2267](https://github.com/StarWarsFoundryVTT/StarWarsFFG/pull/2267), [@KamiliaBlow](https://github.com/KamiliaBlow))
     * Accessible via a button in the compendiums directory for all users (not just GMs)

@@ -2,6 +2,7 @@ import ActorHelpers, {xpLogEarn, xpLogSpend} from "./actor-helpers.js";
 import ItemHelpers from "./item-helpers.js";
 import DiceHelpers from "./dice-helpers.js";
 import {sortDataBy, addIfNotExist} from "../actors/actor-sheet-ffg.js";
+import { activeEffectCreateData } from "../compatibility/active-effects.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api
 
@@ -1063,7 +1064,7 @@ export class CharacterCreator extends HandlebarsApplicationMixin(ApplicationV2) 
         await existingActor.delete();
       }
       // temporary: create a new actor to add stuff to
-      const tempActor = await Actor.create(
+      const tempActor = await CONFIG.Actor.documentClass.create(
         {
           name: `temp actor - ${game.user.name}`,
           type: "character",
@@ -1212,11 +1213,11 @@ export class CharacterCreator extends HandlebarsApplicationMixin(ApplicationV2) 
         name: nk,
         changes: [{
           key: `system.skills.${skillPurchase}.rank`,
-          mode: CONST.ACTIVE_EFFECT_MODES.ADD,
+          type: "add",
           value: 1,
         }],
       };
-      await item.createEmbeddedDocuments("ActiveEffect", [AE]);
+      await item.createEmbeddedDocuments("ActiveEffect", [activeEffectCreateData(AE)]);
     }
   }
 
@@ -1717,7 +1718,7 @@ export class CharacterCreator extends HandlebarsApplicationMixin(ApplicationV2) 
     if (game.user.isGM) {
       // temporary: create a new actor to add stuff to
       CONFIG.logger.debug("creating final actor...");
-      const finalActor = await Actor.create(
+      const finalActor = await CONFIG.Actor.documentClass.create(
         {
           name: `${game.user.name}'s new PC!`,
           type: "character",

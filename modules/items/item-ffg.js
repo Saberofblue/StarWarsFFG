@@ -5,6 +5,7 @@ import ImportHelpers from "../importer/import-helpers.js";
 import ModifierHelpers from "../helpers/modifiers.js";
 import Helpers from "../helpers/common.js";
 import ItemHelpers from "../helpers/item-helpers.js";
+import { activeEffectChangesUpdate, activeEffectCreateData, getActiveEffectChanges } from "../compatibility/active-effects.js";
 
 /**
  * Extend the basic Item with some very simple modifications.
@@ -104,7 +105,7 @@ export class ItemFFG extends ItemBaseFFG {
               );
               effects.changes.push({
                 key: path,
-                mode: CONST.ACTIVE_EFFECT_MODES.ADD,
+                type: "add",
                 value: this.system.attributes[attribute].value,
               });
             }
@@ -121,7 +122,7 @@ export class ItemFFG extends ItemBaseFFG {
             );
             effects.changes.push({
               key: path,
-              mode: CONST.ACTIVE_EFFECT_MODES.ADD,
+              type: "add",
               value: 0,
             });
           }
@@ -138,7 +139,7 @@ export class ItemFFG extends ItemBaseFFG {
               );
               effects.changes.push({
                 key: path,
-                mode: CONST.ACTIVE_EFFECT_MODES.ADD,
+                type: "add",
                 value: 0,
               });
             }
@@ -155,7 +156,7 @@ export class ItemFFG extends ItemBaseFFG {
             );
             effects.changes.push({
               key: path,
-              mode: CONST.ACTIVE_EFFECT_MODES.ADD,
+              type: "add",
               value: 0,
             });
           }
@@ -168,7 +169,7 @@ export class ItemFFG extends ItemBaseFFG {
             const skill = this.system.careerSkills?.[`careerSkill${i}`];
             effects.changes.push({
               key: skill && skill !== "(none)" ? `system.skills.${skill}.careerskill` : "(none)",
-              mode: CONST.ACTIVE_EFFECT_MODES.ADD,
+              type: "add",
               value: true,
             });
           }
@@ -176,7 +177,7 @@ export class ItemFFG extends ItemBaseFFG {
 
         CONFIG.logger.debug(`Creating Active Effect for ${this.name}/${this.type} on item creation`);
         CONFIG.logger.debug(effects);
-        this._inherentAECreation = this.createEmbeddedDocuments("ActiveEffect", [effects]);
+        this._inherentAECreation = this.createEmbeddedDocuments("ActiveEffect", [activeEffectCreateData(effects)]);
         await this._inherentAECreation;
         delete this._inherentAECreation;
       }
@@ -203,14 +204,14 @@ export class ItemFFG extends ItemBaseFFG {
       CONFIG.logger.debug("Unable to locate any inherent effect. This may be expected.");
     }
     if (itemEffect && Object.keys(changed).includes("system") && Object.keys(changed.system).includes("attributes")) {
-      const newChanges = foundry.utils.deepClone(itemEffect.changes);
+      const newChanges = foundry.utils.deepClone(getActiveEffectChanges(itemEffect));
       for (const updateKey of Object.keys(changed.system.attributes)) {
         const existingChange = newChanges.find(c => c.key.startsWith(`system.attributes.${updateKey}`));
         if (existingChange) {
           existingChange.value = parseInt(changed.system.attributes[updateKey].value);
         }
       }
-      await itemEffect.update({changes: newChanges});
+      await itemEffect.update(activeEffectChangesUpdate(newChanges));
     }
 
     // iterate over the changed data to look for any changes to attributes
@@ -228,7 +229,7 @@ export class ItemFFG extends ItemBaseFFG {
         for (const curMod of explodedMods) {
           changes.push({
             key: ModifierHelpers.getModKeyPath(curMod['modType'], curMod['mod']),
-            mode: CONST.ACTIVE_EFFECT_MODES.ADD,
+            type: "add",
             value: attr?.value,
           });
         }
