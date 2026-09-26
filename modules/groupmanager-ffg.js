@@ -363,8 +363,10 @@ export class GroupManager extends FormApplication {
             const note = container.querySelector('input[name="note"]').value;
             const available = +character.system.experience.available + +amount.value;
             const total = +character.system.experience.total + +amount.value;
-            character.update({ ["system.experience.total"]: +character.system.experience.total + +amount.value });
-            character.update({ ["system.experience.available"]: +character.system.experience.available + +amount.value });
+            await character.update({
+              "system.experience.total": total,
+              "system.experience.available": available,
+            });
             await xpLogEarn(character, amount.value, available, total, note);
             await ActorHelpers.endEditMode(character, state, true);
             ui.notifications.info(`Granted ${amount.value} XP to ${character.name}.`);
@@ -404,8 +406,10 @@ export class GroupManager extends FormApplication {
               const state = await ActorHelpers.beginEditMode(character, true);
               const available = +character.system.experience.available + +amount.value;
               const total = +character.system.experience.total + +amount.value;
-              character.update({ ["system.experience.total"]: +character.system.experience.total + +amount.value });
-              character.update({ ["system.experience.available"]: +character.system.experience.available + +amount.value });
+              await character.update({
+                "system.experience.total": total,
+                "system.experience.available": available,
+              });
               await xpLogEarn(character, amount.value, available, total, note);
               await ActorHelpers.endEditMode(character, state, true);
               ui.notifications.info(`Granted ${amount.value} XP to ${character.name}.`);
