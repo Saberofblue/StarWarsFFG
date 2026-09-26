@@ -727,19 +727,24 @@ export class ActorFFG extends foundry.documents.Actor {
     if (phase && phase !== "initial") return super.applyActiveEffects(phase);
 
     // collect force pool modifications since it appears the stat value is without AEs active
-    let maxForceRating = parseInt(this.system?.stats?.forcePool?.max);
+    let maxForceRating = parseInt(this.system?.stats?.forcePool?.max) || 0;
     for (const effect of this.allApplicableEffects()) {
+      // only count enabled effects — disabled Force-Rating AEs (e.g. from unpurchased trees)
+      // must not inflate the force pool
+      if (!effect.active) continue;
       for (const change of getActiveEffectChanges(effect)) {
         if (change.key === "system.stats.forcePool.max") {
-          maxForceRating += parseInt(change.value);
+          maxForceRating += parseInt(change.value) || 0;
         }
       }
     }
     // apply the resulting value (minus any committed dice)
+    const committedForce = parseInt(this.system?.stats?.forcePool?.value) || 0;
     for (const effect of this.allApplicableEffects()) {
+      if (!effect.active) continue;
       for (const change of getActiveEffectChanges(effect)) {
         if (change.key.includes("system.skills") && change.key.includes(".force")) {
-          change.value = Math.max(maxForceRating - parseInt(this.system?.stats?.forcePool?.value), 0);
+          change.value = Math.max(maxForceRating - committedForce, 0);
         }
       }
     }

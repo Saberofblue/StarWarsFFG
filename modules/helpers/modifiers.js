@@ -40,11 +40,19 @@ export default class ModifierHelpers {
                 total += parseInt(item.system.soak.adjusted, 10);
               }
               if ((key === "Defence-Melee" || key === "Defence-Ranged") && item.system?.defence) {
-                // get the highest defense item
-                const shouldUse = items.filter((i) => item.system.defence >= i.system.defence).length >= 0;
-                if (shouldUse) {
+                // FFG defence does not stack across items — count only the single highest-defence
+                // item (ties resolve to the first one encountered), never the sum of all of them.
+                // Only equipped items / attachments contribute defence, matching the guard above.
+                const isDefenceEligible = (i) => i?.system?.defence && (i?.system?.equippable?.equipped || i.type === "itemattachment");
+                const thisDefence = parseInt(item.system.defence.adjusted, 10) || 0;
+                const highest = items.reduce((best, i) => {
+                  if (!isDefenceEligible(i)) return best;
+                  const v = parseInt(i?.system?.defence?.adjusted, 10) || 0;
+                  return v > best.value ? { value: v, item: i } : best;
+                }, { value: -Infinity, item: null });
+                if (highest.item === item && thisDefence > 0) {
                   sources.push({ modtype, key, name: item.name, value: item.system.defence.adjusted, type: item.type });
-                  total += parseInt(item.system.defence.adjusted, 10);
+                  total += thisDefence;
                 }
               }
               if (attrsToApply.length > 0) {
