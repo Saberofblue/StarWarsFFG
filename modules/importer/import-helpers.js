@@ -370,19 +370,25 @@ export default class ImportHelpers {
 
       let skill = CONFIG.temporary.skills[mod.Key];
 
-      if (skill.includes(":") && !skill.includes(": ")) {
-        skill = skill.replace(":", ": ");
-      }
+      // not every base mod is a skill mod (ENCTADD below, for one): an unknown key must not
+      // throw here, or the whole item loses all of its attributes
+      if (typeof skill === "string") {
+        if (skill.includes(":") && !skill.includes(": ")) {
+          skill = skill.replace(":", ": ");
+        }
 
-      if (Object.keys(CONFIG.FFG.skills).includes(skill)) {
-        type = skill;
+        if (Object.keys(CONFIG.FFG.skills).includes(skill)) {
+          type = skill;
+        }
       }
     }
 
     if (mod.Key === "ENCTADD") {
+      // encumbrance THRESHOLD bonus (Backpack +4, Modular Backpack +3, Utility Belt +1, ...):
+      // "Encumbrance" resolves to system.stats.encumbrance.value (what is carried), so the bonus
+      // used to raise the load instead of the limit
       modtype = "Stat";
-      type = "Encumbrance";
-      value = value;
+      type = "EncumbranceMax";
     }
 
     if (type) {
