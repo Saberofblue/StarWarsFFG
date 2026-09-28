@@ -2480,7 +2480,11 @@ export default class ImportHelpers {
             // don't re-import items for existing vehicles, in order to avoid duplicating them
             updateData.items = [];
           }
-          await pack.get(updateData._id).update(updateData);
+          // ffgSkipEffectSync: the effects are deleted and rebuilt just below, so ItemFFG._onUpdate
+
+          // must not sync them concurrently
+
+          await pack.get(updateData._id).update(updateData, { ffgSkipEffectSync: true });
           // update here does not return the UUID, so retrieve the item from the pack to get it
           const updatedItem = await pack.get(updateData._id);
           upd.uuid = updatedItem.uuid;
