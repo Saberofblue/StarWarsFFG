@@ -2843,6 +2843,15 @@ export default class ImportHelpers {
     return output;
   }
 
+  /**
+   * Base-mod descriptor keys that are plain stat bonuses (per Count), mapped onto the system's
+   * Stat modifiers. ENCTADD = "Increases Encumbrance Threshold" (Backpack +4, Modular Backpack +3,
+   * Utility Belt +1, ...).
+   */
+  static STAT_BASE_MODS = {
+    ENCTADD: { modtype: "Stat", mod: "EncumbranceMax" },
+  };
+
   static async processModsData(modifiersData) {
     let output = {
       attributes: {},
@@ -2875,6 +2884,16 @@ export default class ImportHelpers {
             const attribute = ImportHelpers.processCharacteristicMod(modifier);
 
             output.attributes[attribute.type] = attribute.value;
+          } else if (ImportHelpers.STAT_BASE_MODS[modifier.Key]) {
+            // a stat bonus OggDude describes only by its descriptor name (no structured data), so
+            // the installed-modifier path below would carry it as an empty modifier that nothing
+            // applies: store it as the item's own attribute instead, scaled by its Count
+            const statMod = ImportHelpers.STAT_BASE_MODS[modifier.Key];
+            output.attributes[statMod.mod] = {
+              modtype: statMod.modtype,
+              mod: statMod.mod,
+              value: parseInt(modifier.Count, 10) || 1,
+            };
           } else {
             const compendiumEntry = await ImportHelpers.findCompendiumEntityByImportId("Item", modifier.Key);
             if (compendiumEntry) {
@@ -3214,6 +3233,14 @@ export default class ImportHelpers {
             } else {
               inherentChanges[inherentEffectChangeIndex].value = formData.system.attributes[k].value;
             }
+          } else {
+            // a stat the item type's inherent template does not declare (e.g. a backpack's
+            // EncumbranceMax): carry it on the inherent effect too, so it transfers to the actor
+            inherentChanges.push({
+              key: modPath,
+              type: "add",
+              value: formData.system.attributes[k].value,
+            });
           }
         }
       }
