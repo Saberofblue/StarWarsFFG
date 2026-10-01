@@ -40,11 +40,22 @@
         flex: 0 0 24px;
         margin-right: 5px;
       }
-      .toggle-equipped {
+      .toggle-equipped,
+      .toggle-stowed,
+      .toggle-stored {
         color: #888;
         &.active {
           color: #191813;
         }
+      }
+      .item-carry a + a {
+        margin-left: 4px;
+      }
+      &.stowed .item-name,
+      &.stowed .adjusted-value[data-value="encumbrance"],
+      &.stored .adjusted-value[data-value="encumbrance"] {
+        opacity: 0.55;
+        text-decoration: line-through;
       }
     }
     .force-power {

@@ -2499,6 +2499,27 @@ img {
   color: #191813;
 }
 
+.starwarsffg .items .items-list .item .toggle-stowed,
+.starwarsffg .items .items-list .item .toggle-stored {
+  color: #888;
+}
+
+.starwarsffg .items .items-list .item .toggle-stowed.active,
+.starwarsffg .items .items-list .item .toggle-stored.active {
+  color: #191813;
+}
+
+.starwarsffg .items .items-list .item .item-carry a + a {
+  margin-left: 4px;
+}
+
+.starwarsffg .items .items-list .item.stowed .item-name,
+.starwarsffg .items .items-list .item.stowed .adjusted-value[data-value="encumbrance"],
+.starwarsffg .items .items-list .item.stored .adjusted-value[data-value="encumbrance"] {
+  opacity: 0.55;
+  text-decoration: line-through;
+}
+
 .starwarsffg .items .items-list .force-power {
   line-height: 24px;
   padding: 3px 0;

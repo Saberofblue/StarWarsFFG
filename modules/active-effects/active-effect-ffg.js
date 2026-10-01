@@ -1,14 +1,8 @@
-﻿import {
+import {
   activeEffectChangesUpdate,
   activeEffectCreateData,
 } from "../compatibility/active-effects.js";
-import ModifierHelpers from "../helpers/modifiers.js";
-
-/**
- * Item types that only grant what they carry while they are equipped. Ship weapons and ship
- * attachments have an equipped state as well, but no way to set it, so they are left out.
- */
-const equipGatedTypes = ["armour", "weapon"];
+import { carrierIsActive } from "../helpers/item-effects.js";
 
 function disablePushOnItem(options){
   // don't show push/animation if that's an effect from item
@@ -16,6 +10,16 @@ function disablePushOnItem(options){
   {
     options.animate = false;
   }
+}
+
+/**
+ * Whether a change carried by an item should reach the actor right now: weapons and armour only
+ * grant what they carry while equipped, and nothing stowed grants anything. The managed effects
+ * describe what the item would grant; this is where the equip state is applied, so every client
+ * sees the same answer the moment the item changes.
+ */
+function carrierChangeApplies(effect) {
+  return carrierIsActive(effect.parent);
 }
 
 /**
@@ -67,19 +71,20 @@ export class ActiveEffectFFG extends foundry.documents.ActiveEffect {
   }
 
   /**
-   * Weapons and armor only grant what they carry while they are equipped. Encumbrance is the
-   * exception - carrying something is what makes it encumbering in the first place
+   * Version 14 asks each effect whether a change applies before applying it.
+   * @override
+   */
+  shouldApplyChange(change, options) {
+    if (!carrierChangeApplies(this)) return false;
+    return super.shouldApplyChange ? super.shouldApplyChange(change, options) : true;
+  }
+
+  /**
+   * Version 13 applies through the instance; the same gate.
    * @override
    */
   apply(doc, change, ...args) {
-    const item = this.parent;
-    if (
-      equipGatedTypes.includes(item?.type) &&
-      !item.system?.equippable?.equipped &&
-      change.key !== ModifierHelpers.getModKeyPath("Stat", "Encumbrance")
-    ) {
-      return {};
-    }
+    if (!carrierChangeApplies(this)) return {};
     return super.apply(doc, change, ...args);
   }
 }

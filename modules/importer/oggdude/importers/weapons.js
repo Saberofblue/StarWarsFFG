@@ -75,7 +75,8 @@ export default class Weapons {
             };
             //data.data.description += ImportHelpers.getSources(item?.Sources ?? item?.Source);
 
-            data.data.skill.useBrawn = ["Melee", "Brawl", "Lightsaber"].some((element) => data.data.skill.value.includes(element)) && (!item.Damage || item.Damage === "0");
+            // a lightsaber's damage comes from its crystal (a base-damage mod), never from Brawn
+            data.data.skill.useBrawn = ["Melee", "Brawl"].some((element) => data.data.skill.value.includes(element)) && (!item.Damage || item.Damage === "0");
 
             //New setting to be able to use a characteristic as base damage for any weapon.
             if (data.data.skill.useBrawn) {

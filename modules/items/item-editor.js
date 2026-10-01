@@ -178,15 +178,6 @@ export class itemEditor extends FormApplication  {
       // submit the changes so it gets saved even if the user reloads without closing the editor
       await this._updateObject(undefined, this._getSubmitData());
     } else if (action === 'delete') {
-      const modContainer = $(event.currentTarget).parents(".modification_title").find(".attributes-list");
-      for (const mod of modContainer.children()) {
-        const modId = $(mod).data("attribute");
-        const match = this.data.sourceObject.effects.find(i => i.name === modId);
-        if (match) {
-          CONFIG.logger.debug(`Detected mod present on removed modification, deleting active effect added by ${modId}`);
-          await this.data.sourceObject.deleteEmbeddedDocuments("ActiveEffect", [match.id]);
-        }
-      }
       $(event.currentTarget).parent().remove();
       // submit the changes so it gets saved even if the user reloads without closing the editor
       await this._updateObject(undefined, this._getSubmitData());
@@ -227,15 +218,6 @@ export class itemEditor extends FormApplication  {
       // submit the changes so it gets saved even if the user reloads without closing the editor
       await this._updateObject(undefined, this._getSubmitData());
     } else if (action === 'delete') {
-      const modContainer = $(event.currentTarget).parents(".modification_title").find(".attributes-list");
-      for (const mod of modContainer.children()) {
-        const modId = $(mod).data("attribute");
-        const match = this.data.sourceObject.effects.find(i => i.name === modId);
-        if (match) {
-          CONFIG.logger.debug(`Detected mod present on removed modification, deleting active effect added by ${modId}`);
-          await this.data.sourceObject.deleteEmbeddedDocuments("ActiveEffect", [match.id]);
-        }
-      }
       $(event.currentTarget).parent().parent().remove();
       // submit the changes so it gets saved even if the user reloads without closing the editor
       await this._updateObject(undefined, this._getSubmitData());
@@ -296,7 +278,11 @@ export class itemEditor extends FormApplication  {
       const $valueInput = $(event.currentTarget).parent().find(".modvalue");
       if (new_value === "Career Skill") {
         $valueInput.replaceWith(`<input name="${valueName}" type="checkbox" class="modvalue" data-attr-id="${$valueInput.data('attr-id')}">`);
-      } else if ($valueInput.attr('type') === 'checkbox') {
+      } else if (new_value === "Skill Characteristic") {
+        const options = Object.values(CONFIG.FFG.allowableModifierChoices.Characteristic ?? {})
+          .map((c) => `<option value="${c.value}">${game.i18n.localize(c.label)}</option>`).join("");
+        $valueInput.replaceWith(`<select name="${valueName}" class="modvalue" data-attr-id="${$valueInput.data('attr-id')}">${options}</select>`);
+      } else if ($valueInput.attr('type') === 'checkbox' || $valueInput.is('select')) {
         $valueInput.replaceWith(`<input name="${valueName}" type="number" class="modvalue" value="0" data-attr-id="${$valueInput.data('attr-id')}">`);
       }
     }
@@ -304,233 +290,53 @@ export class itemEditor extends FormApplication  {
 
   /** @override */
   async _updateObject(event, formData) {
+    // which stored modification each form row came from: rows keep their original index after a
+    // sibling is deleted, and a row added this session has none
+    const rowIndices = [];
+    for (const key of Object.keys(formData)) {
+      const match = key.match(/^system\.itemmodifier\[(\d*)\]/);
+      if (!match) continue;
+      const index = match[1] === "" ? null : parseInt(match[1], 10);
+      if (!rowIndices.some((i) => i === index)) rowIndices.push(index);
+    }
     formData = ItemHelpers.explodeFormData(formData);
-    const equipped = this.data.sourceObject.system?.equippable?.equipped;
+    // removing every row removes the field from the form entirely; put the empty containers back
+    if (!Object.keys(formData.system).includes("itemmodifier")) formData.system.itemmodifier = [];
+    if (!Object.keys(formData.system).includes("attributes")) formData.system.attributes = {};
 
-    // removing all itemmodifiers removes them from the form entirely; add them back in as an empty array
-    if (!Object.keys(formData.system).includes("itemmodifier")) {
-      formData.system.itemmodifier = [];
+    const type = this.data.clickedObject.type;
+    if (!["itemattachment", "itemmodifier"].includes(type)) return;
+    const list = foundry.utils.deepClone(this.data.sourceObject.system[type] ?? []);
+    // qualities carry no ids of their own on a carrier, so they are matched by name
+    const index = list.findIndex((entry) => type === "itemattachment"
+      ? entry._id === this.data.clickedObject._id
+      : entry.name === this.data.clickedObject.name);
+    if (index < 0) return;
+    const stored = list[index];
+
+    // the form carries every surviving mod row, so a stored key it does not mention was deleted.
+    // These are plain objects inside an array, where Foundry's "-=key" markers mean nothing.
+    const surviving = (attributes) => Object.fromEntries(
+      Object.entries(attributes ?? {}).filter(([key]) => !key.startsWith("-=")));
+    const updated = foundry.utils.mergeObject(stored, formData, { inplace: false });
+    updated.system.attributes = surviving(formData.system.attributes);
+
+    if (type === "itemattachment") {
+      // each modification row is merged over its stored twin so ids, images and flags survive
+      updated.system.itemmodifier = formData.system.itemmodifier.map((row, i) => {
+        const storedIndex = rowIndices[i];
+        const base = (storedIndex === null || storedIndex === undefined)
+          ? { type: "itemmodifier", system: { type: "all", active: false, rank: 0, attributes: {} } }
+          : stored.system?.itemmodifier?.[storedIndex] ?? { type: "itemmodifier", system: {} };
+        const merged = foundry.utils.mergeObject(base, row, { inplace: false });
+        merged.system.attributes = surviving(row.system?.attributes);
+        return merged;
+      });
     }
-
-    // removing all base mods removes them from the form entirely; add back an empty dic (for our deletion keys)
-    if (!Object.keys(formData.system).includes("attributes")) {
-      formData.system.attributes = {};
-    }
-
-    const existingActiveEffects = this.data.sourceObject.getEmbeddedCollection("ActiveEffect");
-
-    // if it's an attachment, locate the attachment to update
-    let updateData;
-    if (this.data.clickedObject.type === "itemattachment") {
-      CONFIG.logger.debug("> Detected item type of itemattachment");
-      updateData = this.data.sourceObject.system.itemattachment;
-      for (let attachment of updateData) {
-        if (attachment._id === this.data.clickedObject._id) {
-          CONFIG.logger.debug(`>> Found relevant attachment: ${attachment.name} / ${attachment.id}, looking for removed keys`);
-          // iterate over the mods on the existing attachment and remove them if they are not present in the new data
-          for (let modKey of Object.keys(attachment.system.attributes)) {
-            if (!Object.keys(formData.system.attributes).includes(modKey)) {
-              CONFIG.logger.debug(`>> Detected key ${modKey} was removed, attempting to locate matching active effect`);
-              formData.system.attributes[`-=${modKey}`] = null;
-              delete attachment.system.attributes[modKey];
-              // delete the active effect
-              const match = existingActiveEffects.find(i => i.name === modKey);
-              if (match) {
-               CONFIG.logger.debug(`>>> Active effect located (${match.id}), deleting`);
-                await this.data.sourceObject.deleteEmbeddedDocuments("ActiveEffect", [match.id]);
-              }
-            }
-          }
-          CONFIG.logger.debug(">> Looking for new or updated ");
-          if (Object.keys(formData.system).includes("attributes")) {
-            for (const modKey of Object.keys(formData.system.attributes)) {
-              CONFIG.logger.debug(">>> Checking modKey", modKey);
-              if (modKey.startsWith("-=")) {
-                CONFIG.logger.debug(`>>>> Skipping mod ${modKey} which will be deleted`);
-                // skip anything queued for deletion
-                continue;
-              }
-              const match = existingActiveEffects.find(i => i.name === modKey);
-              const explodedMods = ModifierHelpers.explodeMod(
-                formData.system.attributes[modKey].modtype,
-                formData.system.attributes[modKey].mod
-              );
-
-              const changes = [];
-              for (const curMod of explodedMods) {
-                changes.push({
-                  key: ModifierHelpers.getModKeyPath(curMod['modType'], curMod['mod']),
-                  type: "add",
-                  value: formData.system.attributes[modKey].value,
-                });
-              }
-
-              if (match) {
-                // existing entry
-                CONFIG.logger.debug(`>>>> Staged AE changes for update: ${JSON.stringify(changes)}`);
-                await match.update({
-                  changes: changes,
-                  disabled: !equipped,
-                });
-              } else {
-                // new entry
-                const effect = {
-                  name: modKey,
-                  changes: changes,
-                  disabled: !equipped,
-                };
-                CONFIG.logger.debug(`>>>> Staged AE for creation: ${JSON.stringify(effect)}`);
-                await this.data.sourceObject.createEmbeddedDocuments("ActiveEffect", [effect]);
-              }
-            }
-          }
-
-          // repeat the process, but this time for mods on modifications on the attachment
-          CONFIG.logger.debug(">> checking modifications...");
-          if (Object.keys(formData.system).includes("itemmodifier")) {
-            for (const modifier of Object.values(formData.system.itemmodifier)) {
-              if (!Object.keys(modifier.system).includes("attributes")) {
-                // skip anything that doesn't have attributes
-                CONFIG.logger.debug(`>>> modification ${modifier.name} has no mods, skipping further processing`);
-                continue;
-              }
-
-              for (const modKey of Object.keys(modifier.system.attributes)) {
-                CONFIG.logger.debug(">>> Checking modKey", modKey);
-                if (modKey.startsWith("-=")) {
-                  CONFIG.logger.debug(`>>>> Skipping mod ${modKey} which will be deleted`);
-                  // skip anything queued for deletion
-                  continue;
-                }
-
-
-                const match = existingActiveEffects.find(i => i.name === modKey);
-                const explodedMods = ModifierHelpers.explodeMod(
-                  modifier.system.attributes[modKey].modtype,
-                  modifier.system.attributes[modKey].mod
-                );
-
-                const changes = [];
-                for (const curMod of explodedMods) {
-                  changes.push({
-                    key: ModifierHelpers.getModKeyPath(curMod['modType'], curMod['mod']),
-                    type: "add",
-                    value: modifier.system.attributes[modKey].value,
-                  });
-                }
-
-                let disabled;
-                if (modifier.system.active === equipped) {
-                  // if they're both enabled or disabled, use the opposite value
-                  disabled = !modifier.system.active;
-                } else {
-                  // if either is not enabled, disable the active effect
-                  disabled = true;
-                }
-
-                if (match) {
-                  // existing entry
-                  CONFIG.logger.debug(`>>>> Staged AE changes for update: ${JSON.stringify(changes)}`);
-                  await match.update({
-                    changes: changes,
-                    disabled: disabled,
-                  });
-                } else {
-                  // new entry
-                  const effect = {
-                    name: modKey,
-                    disabled: disabled,
-                    changes: changes,
-                  };
-                  CONFIG.logger.debug(`>>>> Staged AE for creation: ${JSON.stringify(effect)}`);
-                  await this.data.sourceObject.createEmbeddedDocuments("ActiveEffect", [effect]);
-                }
-              }
-            }
-          }
-
-          // merge the existing data in so we end up with all fields present
-          attachment = foundry.utils.mergeObject(
-            attachment,
-            formData,
-          );
-          // pull the updated data back into our local record of what it should look like
-          this.data.clickedObject = attachment;
-        }
-      }
-      await this.data.sourceObject.update({system: {itemattachment: updateData}});
-    }
-
-    // if it's a mod, locate the mod to update
-    if (this.data.clickedObject.type === "itemmodifier") {
-      updateData = this.data.sourceObject.system.itemmodifier;
-      for (let modifier of updateData) {
-        // select based on names instead of IDs, as IDs are not present here
-        if (modifier.name === this.data.clickedObject.name) {
-          // iterate over the mods on the existing item and remove them if they are not present in the new data
-          for (let modKey of Object.keys(modifier.system.attributes)) {
-            if (!Object.keys(formData.system.attributes).includes(modKey)) {
-              formData.system.attributes[`-=${modKey}`] = null;
-              delete modifier.system.attributes[modKey];
-              // delete the active effect
-              const match = existingActiveEffects.find(i => i.name === modKey);
-              if (match) {
-                CONFIG.logger.debug(`>>> Active effect located (${match.id}), deleting`);
-                await this.data.sourceObject.deleteEmbeddedDocuments("ActiveEffect", [match.id]);
-              }
-            }
-          }
-          // merge the existing data in so we end up with all fields present
-          modifier = foundry.utils.mergeObject(
-            modifier,
-            formData,
-          );
-          // pull the updated data back into our local record of what it should look like
-          this.data.clickedObject = modifier;
-        }
-      }
-
-      // iterate over the submitted data to find new/updated entries
-      for (const modKey of Object.keys(formData.system.attributes)) {
-        if (modKey.startsWith("-=")) {
-          continue;
-        }
-
-        const match = existingActiveEffects.find(i => i.name === modKey);
-        const explodedMods = ModifierHelpers.explodeMod(
-          formData.system.attributes[modKey].modtype,
-          formData.system.attributes[modKey].mod
-        );
-
-        const changes = [];
-        for (const curMod of explodedMods) {
-          changes.push({
-            key: ModifierHelpers.getModKeyPath(curMod['modType'], curMod['mod']),
-            type: "add",
-            value: formData.system.attributes[modKey].value,
-          });
-        }
-
-        if (match) {
-          // existing entry
-          CONFIG.logger.debug(`>>>> Staged AE changes for update: ${JSON.stringify(changes)}`);
-          await match.update({
-            changes: changes,
-            disabled: !equipped,
-          });
-        } else {
-          // new entry
-          const effect = {
-            name: modKey,
-            changes: changes,
-            disabled: !equipped,
-          };
-          CONFIG.logger.debug(`>>>> Staged AE for creation: ${JSON.stringify(effect)}`);
-          await this.data.sourceObject.createEmbeddedDocuments("ActiveEffect", [effect]);
-        }
-      }
-      await this.data.sourceObject.update({system: {itemmodifier: updateData}});
-    }
+    list[index] = updated;
+    this.data.clickedObject = updated;
+    // the carrier's update brings its managed effects in line with the new data
+    await this.data.sourceObject.update({ system: { [type]: list } });
     // needed to re-render the mod form (as the input can change types based on the selected modType)
     this.render(true)
   }

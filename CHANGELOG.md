@@ -1,3 +1,22 @@
+`2.0.5`
+* Equipment effects rebuilt:
+  * A weapon, armour, gear item, ship weapon or ship attachment now carries two Active Effects, `(inherent)` (what the item itself grants) and `(mods)` (what its qualities, attachment base mods and installed modifications grant), rebuilt from the item's data whenever it changes. The old per-attribute effects are removed on first launch (`game.ffg.ItemEffects.rebuildWorld()` repeats the rebuild; the console reports every actor whose stats changed).
+  * Every modifier applies once per rank, uninstalled modifications apply nothing, and the item's adjusted stats, its actor effects and its dice pool all come from the same computation.
+  * Weapons and armour grant their effects only while equipped; ship weapons likewise. Equip state is checked when effects apply, so every client agrees immediately.
+  * A base mod can set a stat rather than add to it (`Base Damage (set to)`, `Base Critical`, `Base Soak`, `Base Defense`): a lightsaber crystal's damage and crit now reach the weapon.
+  * A weapon that adds a characteristic to damage follows a talent that changes the characteristic its skill is rolled with (Ataru Technique: Agility).
+* Carrying equipment:
+  * Items can be stowed (the box icon in the inventory): a stowed item adds no encumbrance, grants nothing and cannot be rolled, and stowing worn equipment takes it off.
+  * Holsters, weapon mounts and pouches: a weapon or gear item can be stored in a holster on carried equipment (the vest icon), where it stops counting toward encumbrance. Each rank of a storage mod is one slot, with the mod's encumbrance, type and skill limits.
+  * Encumbrance: the current value counts carried, unstored items (worn armour three less); the threshold comes from the base plus every carried `Increases Encumbrance Threshold` quality, once per rank. The inventory shows each item's encumbrance.
+  * Gear has hard points and takes attachments and qualities.
+* OggDude import:
+  * Item descriptors now carry what they do (Damage +1, Decrease Critical, Remove Setback, Soak +1, Increase Encumbrance Threshold, holster slots, ...) instead of text alone, and an attachment keeps its base mods as installed modifications. Added mods arrive not installed, one rank each, capped by their count.
+  * A modification that names a talent (Integrated Holsters' Quick Draw) grants that talent while installed on carried equipment, and takes it back when uninstalled, unequipped or removed.
+  * Talents with `<SkillChars>` (the lightsaber form techniques) change the characteristic a skill is rolled with, as a `Skill Characteristic` modifier.
+  * Lightsaber hilts no longer add Brawn to damage: a lightsaber's damage comes from its crystal.
+  * Re-import the Item Modifiers, Attachments, Gear, Weapons, Armor and Talents data, then re-import characters, to get the new data.
+
 `2.0.4`
 * Enhancements:
   * Adds support for Foundry VTT 14 build 366 while retaining Foundry VTT 13 support.
