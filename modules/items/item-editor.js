@@ -44,6 +44,14 @@ export class itemEditor extends FormApplication  {
     // update the title since it isn't available when creating the application
     this.options.title = game.i18n.format("SWFFG.Items.Popout.Title", {currentItem: this.data.clickedObject.name, parentItem: this.data.sourceObject.name});
     const data = await this._enrichData();
+    if (this.data.clickedObject.type === "itemattachment") {
+      data.hardpoints = this._hardpointBudget();
+      for (const modification of data.clickedObject.system.itemmodifier ?? []) {
+        modification.isBaseMod = !!modification.flags?.starwarsffg?.baseMod;
+        modification.hint = itemEditor.describeModification(modification);
+      }
+      data.clickedObject.hint = itemEditor.describeModification({ system: { attributes: data.clickedObject.system.attributes } });
+    }
     let modifierChoices = CONFIG.FFG.allowableModifierChoices;
 
     // add in custom skills from the actor, if present
@@ -60,6 +68,59 @@ export class itemEditor extends FormApplication  {
       modifierChoices: modifierChoices,
       data: data,
     };
+  }
+
+  /**
+   * The carrier's hard points: its budget, what every attachment on it spends, and what this one costs.
+   */
+  _hardpointBudget() {
+    const carrier = this.data.sourceObject;
+    const hp = carrier.system?.hardpoints ?? {};
+    const budget = parseInt(hp.adjusted ?? hp.value, 10) || 0;
+    const used = (carrier.system?.itemattachment ?? []).reduce((sum, a) => sum + (parseInt(a?.system?.hardpoints?.value, 10) || 0), 0);
+    const cost = parseInt(this.data.clickedObject.system?.hardpoints?.value, 10) || 0;
+    return { budget, used, cost, free: budget - used, over: budget - used < 0 };
+  }
+
+  /**
+   * What a modification does, in words, from its attributes, storage and grants.
+   * @param {object} modification
+   * @returns {string}
+   */
+  static describeModification(modification) {
+    const parts = [];
+    const ranked = (parseInt(modification?.system?.rank, 10) || 1) > 1 || modification?.system?.maxRank > 1;
+    for (const attr of Object.values(modification?.system?.attributes ?? {})) {
+      if (!attr || typeof attr !== "object") continue;
+      const modtype = String(attr.modtype ?? "");
+      const mod = String(attr.mod ?? "");
+      const choice = CONFIG.FFG.allowableModifierChoices?.[modtype]?.[mod];
+      const label = game.i18n.localize(choice?.label ?? mod);
+      const typeLabel = game.i18n.localize(CONFIG.FFG.allowableModifierTypes?.[modtype]?.label ?? modtype);
+      if (mod.endsWith("-set")) {
+        parts.push(game.i18n.format("SWFFG.Items.Popout.Hint.SetTo", { label, value: attr.value }));
+      } else if (modtype === "Career Skill") {
+        parts.push(`${typeLabel}: ${label}`);
+      } else if (modtype === "Skill Characteristic") {
+        parts.push(`${label}: ${game.i18n.localize(CONFIG.FFG.allowableModifierChoices?.Characteristic?.[attr.value]?.label ?? attr.value)}`);
+      } else {
+        const value = Number(attr.value);
+        const amount = Number.isFinite(value) ? `${value >= 0 ? "+" : ""}${value}` : String(attr.value);
+        const scope = modtype.startsWith("Skill") ? `${label} (${typeLabel})` : label;
+        parts.push(`${amount} ${scope}${ranked ? ` ${game.i18n.localize("SWFFG.Items.Popout.Hint.PerRank")}` : ""}`);
+      }
+    }
+    const storage = modification?.system?.storage;
+    if (storage && (storage.encLimit !== undefined || storage.types?.length)) {
+      const limits = [];
+      if (storage.encLimit !== undefined && storage.encLimit !== null) limits.push(`${game.i18n.localize("SWFFG.ItemsEncum")} <= ${storage.encLimit}`);
+      if (storage.types?.length) limits.push(storage.types.join("/"));
+      if (storage.skills?.length) limits.push(storage.skills.join("/"));
+      parts.push(game.i18n.format("SWFFG.Items.Popout.Hint.Storage", { count: parseInt(modification.system.rank, 10) || 1, limits: limits.length ? ` (${limits.join(", ")})` : "" }));
+    }
+    const grants = modification?.system?.grants;
+    if (grants?.type === "talent") parts.push(game.i18n.format("SWFFG.Items.Popout.Hint.Grants", { name: grants.name ?? grants.key }));
+    return parts.join("; ");
   }
 
   /**
@@ -330,6 +391,10 @@ export class itemEditor extends FormApplication  {
           : stored.system?.itemmodifier?.[storedIndex] ?? { type: "itemmodifier", system: {} };
         const merged = foundry.utils.mergeObject(base, row, { inplace: false });
         merged.system.attributes = surviving(row.system?.attributes);
+        // a base mod has no Installed box on the form, and stays installed
+        if (base.flags?.starwarsffg?.baseMod) merged.system.active = true;
+        const cap = parseInt(merged.system.maxRank, 10);
+        if (cap > 0 && (parseInt(merged.system.rank, 10) || 0) > cap) merged.system.rank = cap;
         return merged;
       });
     }

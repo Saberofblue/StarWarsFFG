@@ -33,6 +33,8 @@ export default class ItemDescriptors {
       try {
         let data;
         if (Array.isArray(item.Type)) item.Type = item.Type[0];
+        // a whitespace-only <Type> parses to an object
+        item.Type = typeof item.Type === "string" ? item.Type.trim() : "";
         if (item?.Type?.toLowerCase() === "vehicle") {
           data = ImportHelpers.prepareBaseObject(item, "shipattachment");
         } else {

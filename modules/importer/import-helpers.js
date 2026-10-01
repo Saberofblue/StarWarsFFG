@@ -2485,9 +2485,11 @@ export default class ImportHelpers {
 
           // must not sync them concurrently
 
-          await pack.get(updateData._id).update(updateData, { ffgSkipEffectSync: true });
-          // update here does not return the UUID, so retrieve the item from the pack to get it
-          const updatedItem = await pack.get(updateData._id);
+          // getDocument loads the document when the pack's contents are not loaded yet; get() would return nothing
+          const updatedItem = await pack.getDocument(updateData._id);
+          await updatedItem.update(updateData, { ffgSkipEffectSync: true });
+          // later lookups by import id (an attachment picking up its modifiers) must see the updated data
+          upd = foundry.utils.duplicate(updatedItem);
           upd.uuid = updatedItem.uuid;
           if (type === "Item") {
             // the imported data is authoritative, so drop the Active Effects and build them again
@@ -2864,6 +2866,7 @@ export default class ImportHelpers {
    */
   static DESCRIPTOR_MODS = {
     // the weapon
+    SUPERIOR: [["Weapon Stat", "damage", 1], ["Result Modifiers", "Add Advantage", 1], ["Armor Stat", "soak", 1]],
     DAMADD: [["Weapon Stat", "damage", 1]],
     DAMADDCRYS: [["Weapon Stat", "damage", 1]],
     DAMSUB: [["Weapon Stat", "damage", -1]],

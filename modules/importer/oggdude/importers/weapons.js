@@ -50,7 +50,9 @@ export default class Weapons {
                 isrestricted: item.Restricted === "true" ? true : false,
               },
               damage: {
-                value: parseInt(!item?.Damage ? item.DamageAdd : item.Damage, 10),
+                // a Brawn weapon's "+N" (DamageAdd) is the damage modifier written further down, so its base is 0;
+                // hilts, shields, shock gloves, tractor beams and the like have no damage of their own either
+                value: parseInt(item?.Damage, 10) || 0,
               },
               crit: {
                 value: item.Crit ? parseInt(item.Crit, 10) : 0,

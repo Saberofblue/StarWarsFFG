@@ -2,7 +2,7 @@ import {
   activeEffectChangesUpdate,
   activeEffectCreateData,
 } from "../compatibility/active-effects.js";
-import { carrierIsActive } from "../helpers/item-effects.js";
+import { carrierIsActive, INHERENT_EFFECT, MANAGED_FLAG } from "../helpers/item-effects.js";
 
 function disablePushOnItem(options){
   // don't show push/animation if that's an effect from item
@@ -18,8 +18,38 @@ function disablePushOnItem(options){
  * describe what the item would grant; this is where the equip state is applied, so every client
  * sees the same answer the moment the item changes.
  */
-function carrierChangeApplies(effect) {
-  return carrierIsActive(effect.parent);
+function carrierChangeApplies(effect, change) {
+  const item = effect.parent;
+  if (!carrierIsActive(item)) return false;
+  const stat = change ? ARMOUR_STAT_KEYS[change.key] : null;
+  if (stat && item?.type === "armour" && effect.name === INHERENT_EFFECT && effect.flags?.starwarsffg?.[MANAGED_FLAG]) {
+    return bestArmourFor(item, stat) === item;
+  }
+  return true;
+}
+
+/** The actor stat each line of an armour's own (inherent) effect feeds, by change key. */
+const ARMOUR_STAT_KEYS = {
+  "system.stats.soak.value": "soak",
+  "system.stats.defence.melee": "defence",
+  "system.stats.defence.ranged": "defence",
+};
+
+/**
+ * Armour does not stack: of the armour an actor wears, only the piece with the highest value grants
+ * that stat (soak and defence judged separately, ties to the first in the inventory), as OggDude
+ * and the rules have it. Mods and talents carried by the other pieces still apply.
+ */
+function bestArmourFor(item, stat) {
+  const actor = item.actor ?? item.parent;
+  if (!actor?.items) return item;
+  const value = (armour) => parseInt(armour.system?.[stat]?.adjusted ?? armour.system?.[stat]?.value, 10) || 0;
+  let best = null;
+  for (const armour of actor.items) {
+    if (armour.type !== "armour" || !carrierIsActive(armour)) continue;
+    if (best === null || value(armour) > value(best)) best = armour;
+  }
+  return best ?? item;
 }
 
 /**
@@ -75,7 +105,7 @@ export class ActiveEffectFFG extends foundry.documents.ActiveEffect {
    * @override
    */
   shouldApplyChange(change, options) {
-    if (!carrierChangeApplies(this)) return false;
+    if (!carrierChangeApplies(this, change)) return false;
     return super.shouldApplyChange ? super.shouldApplyChange(change, options) : true;
   }
 
@@ -84,7 +114,7 @@ export class ActiveEffectFFG extends foundry.documents.ActiveEffect {
    * @override
    */
   apply(doc, change, ...args) {
-    if (!carrierChangeApplies(this)) return {};
+    if (!carrierChangeApplies(this, change)) return {};
     return super.apply(doc, change, ...args);
   }
 }

@@ -39,6 +39,11 @@ nothing should write their `disabled` flag (edit mode suspends and restores it).
 Whether the effects apply is decided when they are applied: `ActiveEffectFFG.shouldApplyChange`
 (Version 14) and `apply` (Version 13) refuse changes from a stowed item, or an unequipped weapon,
 armour or ship weapon. The effects therefore always describe what the item would grant.
+Armour does not stack: of the armour an actor wears, the same gate lets only the piece with the
+highest soak grant soak and only the piece with the highest defence grant defence (judged
+separately; ties go to the first in the inventory). A weapon or armour stat modifier that does not
+fit its carrier (a Superior quality's soak on a weapon) is dropped by the computation rather than
+written as an actor change.
 
 Effects named after a modifier attribute (`attr…`), and the `Superior` effect the companion
 importer used to synthesise, belong to the previous pipeline and are deleted by the sync. Hand-made

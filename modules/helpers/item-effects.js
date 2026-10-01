@@ -223,6 +223,8 @@ export function computeItemEffects(item, { rangeBands = null } = {}) {
         }
         continue;
       }
+      // an item stat the carrier does not have (a Superior quality's soak on a weapon) is nothing, never an actor change
+      if (modtype === "Weapon Stat" || modtype === "Armor Stat") continue;
 
       const diceField = DICE[modtype]?.[mod];
       if (diceField) {
@@ -387,6 +389,11 @@ export async function syncManagedEffects(item, { force = false } = {}) {
     }
     for (const effect of effects) {
       if (isLegacyEffect(effect, computed.legacyNames)) toDelete.push(effect.id);
+    }
+    // a second copy of a managed effect (two syncs that could not see each other) would count twice
+    for (const name of [INHERENT_EFFECT, MODS_EFFECT]) {
+      const copies = effects.filter((e) => (e.flags?.starwarsffg?.[MANAGED_FLAG] ?? e.name) === name);
+      for (const extra of copies.slice(1)) if (!toDelete.includes(extra.id)) toDelete.push(extra.id);
     }
 
     if (toDelete.length) await item.deleteEmbeddedDocuments("ActiveEffect", toDelete);
