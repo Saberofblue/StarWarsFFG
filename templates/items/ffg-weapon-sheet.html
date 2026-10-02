@@ -85,7 +85,7 @@
           </div>
 
           <div class="container flex-group-center weapon-values">
-            {{> "systems/starwarsffg/templates/parts/shared/ffg-block.html" (object blocktype="single" title="SWFFG.ItemWeaponSkill" type="Dropdown" name="data.skill.value" value=data.skill.value options=this.FFG.skills)}}
+            {{> "systems/starwarsffg/templates/parts/shared/ffg-block.html" (object blocktype="single" title="SWFFG.ItemWeaponSkill" type="Dropdown" name="data.skill.value" value=data.skill.value options=this.FFG.skills adjusted=data.skill.adjustedLabel)}}
             {{> "systems/starwarsffg/templates/parts/shared/ffg-block.html" (object blocktype="single" title="SWFFG.ItemWeaponRange" type="Dropdown" name="data.range.value" value=data.range.value options=this.FFG.ranges adjusted=data.range.label) }}
             {{> "systems/starwarsffg/templates/parts/shared/ffg-block.html" (object blocktype="single" title="SWFFG.ItemWeaponStatus" type="Dropdown" name="data.status" value=data.status options=this.FFG.itemstatus)}}
           </div>
