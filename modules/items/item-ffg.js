@@ -452,7 +452,9 @@ export class ItemFFG extends ItemBaseFFG {
    * Prepare and return details of the item for display in inventory or chat.
    */
   async getItemDetails() {
-    const data = foundry.utils.duplicate(this.system);
+    // a copy of the prepared data: the adjusted stats and sources live there, not in the stored
+    // source a duplicate() of the model would give
+    const data = foundry.utils.deepClone({ ...this.system });
 
     // Item type specific properties
     const props = [];
