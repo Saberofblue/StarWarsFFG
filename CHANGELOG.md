@@ -11,6 +11,9 @@
   * Two more weapon stat modifiers: `Skill (change to)` rolls the weapon with another skill (a pistol grip makes a rifle a Ranged: Light weapon; the sheet, chat card and Token Action HUD follow), and `Range (no longer than)` caps the range (an H9 pistol grip: Medium). The weapon's own skill and range are kept.
   * Ship weapons are mounted when installed on a vehicle, and the vehicle sheet has a toggle to unmount one (an unmounted weapon grants nothing). Existing vehicles have their ship weapons mounted on first launch.
   * Armour does not stack: of the armour a character wears, only the piece with the highest soak grants soak, and only the piece with the highest defence grants defence (ties go to the first in the inventory). Mods and talents carried by the other pieces still apply. This matches OggDude and the rules.
+* Obligation:
+  * The Group Manager's obligation and duty tables now list the obligation items a character carries (what the sheet's add control, the character creator and the importer make), as well as the older keyed lists. Before, a character made in the creator never appeared in the GM's obligation roll.
+  * The character creator refuses a starting bonus that would take Obligation past double the group's starting value (Edge of the Empire Table 2-1), and greys those options out. The Default Obligation setting's hint now carries the table.
 * Carrying equipment:
   * Items can be stowed (the box icon in the inventory): a stowed item adds no encumbrance, grants nothing and cannot be rolled, and stowing worn equipment takes it off.
   * Holsters, weapon mounts and pouches: a weapon or gear item can be stored in a holster on carried equipment (the vest icon), where it stops counting toward encumbrance. Each rank of a storage mod is one slot, with the mod's encumbrance, type and skill limits.
